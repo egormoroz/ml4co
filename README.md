@@ -71,11 +71,11 @@ run the competition.
 ### UPD: environment setup
 ```
 conda create --name asdf
+conda activate asdf
 conda install pytorch torchvision torchaudio cudatoolkit=10.2 -c pytorch
 conda install pyg -c pyg
 conda install scip -c scip
 conda install ecole -c ecole
 conda install -c conda-forge ecole
 conda install numpy
-conda activate asdf
 ```
