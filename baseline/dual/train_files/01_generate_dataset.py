@@ -340,8 +340,8 @@ if __name__ == '__main__':
         out_dir = 'train_files/samples/3_anonymous'
 
     elif args.problem == 'miplib':
-        instances_train = glob.glob('../../instances/miplib/train/*.mps.gz')
-        instances_valid = glob.glob('../../instances/miplib/valid/*.mps.gz')
+        instances_train = sorted(glob.glob('../../instances/miplib/train/*.mps.gz'))
+        instances_valid = sorted(glob.glob('../../instances/miplib/valid/*.mps.gz'))
         out_dir = 'train_files/samples/miplib'
 
     else:
