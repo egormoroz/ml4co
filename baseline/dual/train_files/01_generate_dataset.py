@@ -11,10 +11,15 @@ import argparse
 import threading
 import numpy as np
 from pathlib import Path
+from datetime import datetime
 
 # import environment
 sys.path.append('../..')
 from common.environments import Branching as Environment
+
+def myprint(*args, **kwargs):
+    print(f'[{datetime.now()}]', end=' ')
+    print(*args, **kwargs)
 
 
 class ExploreThenStrongBranch:
@@ -119,18 +124,25 @@ def make_samples(in_queue, out_queue, stop_flag):
     stop_flag: threading.Event
         A flag to tell the thread to stop.
     """
+
+
     sample_counter = 0
     while not stop_flag.is_set():
         episode, instance, initial_primal_bound, seed, query_expert_prob, time_limit, out_dir = in_queue.get()
 
         observation_function = { 'scores': ExploreThenStrongBranch(expert_probability=query_expert_prob),
                                  'node_observation': ecole.observation.NodeBipartite() }
+        scip_parameters = {
+            "limits/memory": 2048,
+            "limits/time": time_limit,
+        }
         env = Environment(
             time_limit=time_limit,
             observation_function=observation_function,
+            scip_params=scip_parameters,
         )
 
-        print(f"[w {threading.current_thread().name}] episode {episode}, seed {seed}, "
+        myprint(f"[w {threading.current_thread().name}] episode {episode}, seed {seed}, "
               f"processing instance '{instance}'...\n", end='')
         out_queue.put({
             'type': 'start',
@@ -141,6 +153,7 @@ def make_samples(in_queue, out_queue, stop_flag):
 
         env.seed(seed)
         observation, action_set, _, done, _ = env.reset(str(instance), objective_limit=initial_primal_bound)
+        #observation, action_set, _, done, _ = env.reset(str(instance))
         while not done:
             scores, scores_are_expert = observation["scores"]
             node_observation = observation["node_observation"]
@@ -179,7 +192,7 @@ def make_samples(in_queue, out_queue, stop_flag):
                     f.write(f"Error occurred solving {instance} with seed {seed}\n")
                     f.write(f"{e}\n")
 
-        print(f"[w {threading.current_thread().name}] episode {episode} done, {sample_counter} samples\n", end='')
+        myprint(f"[w {threading.current_thread().name}] episode {episode} done, {sample_counter} samples\n", end='')
         out_queue.put({
             'type': 'done',
             'episode': episode,
@@ -272,13 +285,13 @@ def collect_samples(instances, out_dir, rng, n_samples, n_jobs, query_expert_pro
                     os.rename(sample['filename'], f'{out_dir}/sample_{i+1}.pkl')
                     in_buffer -= 1
                     i += 1
-                    print(f"[m {threading.current_thread().name}] {i} / {n_samples} samples written, "
+                    myprint(f"[m {threading.current_thread().name}] {i} / {n_samples} samples written, "
                           f"ep {sample['episode']} ({in_buffer} in buffer).\n", end='')
 
                     # early stop dispatcher
                     if in_buffer + i >= n_samples and dispatcher.is_alive():
                         dispatcher_stop_flag.set()
-                        print(f"[m {threading.current_thread().name}] dispatcher stopped...\n", end='')
+                        myprint(f"[m {threading.current_thread().name}] dispatcher stopped...\n", end='')
 
                     # as soon as enough samples are collected, stop
                     if i == n_samples:
@@ -313,15 +326,13 @@ if __name__ == '__main__':
     )
     args = parser.parse_args()
 
-    print(f"seed {args.seed}")
+    myprint(f"seed {args.seed}")
 
     # parameters
     node_record_prob = 0.05 # probability of running the expert strategy and collecting samples.
-    time_limit = 3600 # time limit for solving each instance
-#    train_size = 100000 # number of samples of each type
-#    valid_size = 20000
-    train_size = 606
-    valid_size = 150
+    time_limit = 1200 # time limit for solving each instance
+    train_size = 100000 # number of samples of each type
+    valid_size = 20000
 
     # get instances
     if args.problem == 'item_placement':
@@ -340,15 +351,15 @@ if __name__ == '__main__':
         out_dir = 'train_files/samples/3_anonymous'
 
     elif args.problem == 'miplib':
-        instances_train = sorted(glob.glob('../../instances/miplib/train/*.mps.gz'))
-        instances_valid = sorted(glob.glob('../../instances/miplib/valid/*.mps.gz'))
+        instances_train = glob.glob('../../instances/miplib/train/*.mps.gz')
+        instances_valid = glob.glob('../../instances/miplib/valid/*.mps.gz')
         out_dir = 'train_files/samples/miplib'
 
     else:
         raise NotImplementedError
 
-    print(f"{len(instances_train)} train instances for {train_size} samples")
-    print(f"{len(instances_valid)} validation instances for {valid_size} samples")
+    myprint(f"{len(instances_train)} train instances for {train_size} samples")
+    myprint(f"{len(instances_valid)} validation instances for {valid_size} samples")
 
     # create output directory, throws an error if it already exists
     os.makedirs(out_dir)

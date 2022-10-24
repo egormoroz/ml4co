@@ -123,7 +123,7 @@ if __name__ == "__main__":
 
     # hyper parameters
     max_epochs = 1000
-    batch_size = 12
+    batch_size = 128
     pretrain_batch_size = 128
     valid_batch_size = 128
     lr = 1e-3
@@ -193,8 +193,8 @@ if __name__ == "__main__":
     log(f"seed {args.seed}", logfile)
 
     # data setup
-    from torch_geometric.data import DataLoader
-    #from torch.utils.data import DataLoader
+    #from torch_geometric.data import DataLoader
+    from torch_geometric.loader import DataLoader
     valid_data = GraphDataset(valid_files)
     pretrain_data = GraphDataset(pretrain_files)
     valid_loader = DataLoader(valid_data, valid_batch_size, shuffle=False)
