@@ -12,6 +12,7 @@ import threading
 import numpy as np
 from pathlib import Path
 from datetime import datetime
+import time
 
 # import environment
 sys.path.append('../..')
@@ -226,6 +227,8 @@ def collect_samples(instances, out_dir, rng, n_samples, n_jobs, query_expert_pro
     """
     os.makedirs(out_dir, exist_ok=True)
 
+    start_tp = time.time()
+
     # start workers
     orders_queue = queue.Queue(maxsize=2*n_jobs)
     answers_queue = queue.SimpleQueue()
@@ -285,8 +288,12 @@ def collect_samples(instances, out_dir, rng, n_samples, n_jobs, query_expert_pro
                     os.rename(sample['filename'], f'{out_dir}/sample_{i+1}.pkl')
                     in_buffer -= 1
                     i += 1
+                    elapsed = time.time() - start_tp
+                    samples_per_sec = i / elapsed
+                    eta = ((n_samples - i) / samples_per_sec) / 3600
                     myprint(f"[m {threading.current_thread().name}] {i} / {n_samples} samples written, "
-                          f"ep {sample['episode']} ({in_buffer} in buffer).\n", end='')
+                          f"ep {sample['episode']} ({in_buffer} in buffer) "
+                            "{:.2f} samples/s eta: {:.2f}h.\n".format(samples_per_sec, eta), end='')
 
                     # early stop dispatcher
                     if in_buffer + i >= n_samples and dispatcher.is_alive():
@@ -331,7 +338,7 @@ if __name__ == '__main__':
     # parameters
     node_record_prob = 0.05 # probability of running the expert strategy and collecting samples.
     time_limit = 1200 # time limit for solving each instance
-    train_size = 100000 # number of samples of each type
+    train_size = 200000 # number of samples of each type
     valid_size = 20000
 
     # get instances

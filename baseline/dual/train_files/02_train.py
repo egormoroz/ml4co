@@ -124,6 +124,7 @@ if __name__ == "__main__":
     # hyper parameters
     max_epochs = 1000
     batch_size = 128
+    batches_per_epoch = 40960 // batch_size
     pretrain_batch_size = 128
     valid_batch_size = 128
     lr = 1e-3
@@ -210,7 +211,7 @@ if __name__ == "__main__":
             n = pretrain(policy, pretrain_loader)
             log(f"PRETRAINED {n} LAYERS", logfile)
         else:
-            epoch_train_files = rng.choice(train_files, int(np.floor(10000/batch_size))*batch_size, replace=True)
+            epoch_train_files = rng.choice(train_files, batches_per_epoch*batch_size, replace=True)
             train_data = GraphDataset(epoch_train_files)
             train_loader = DataLoader(train_data, batch_size, shuffle=True)
             train_loss, train_kacc = process(policy, train_loader, top_k, optimizer)

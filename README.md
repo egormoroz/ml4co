@@ -68,14 +68,3 @@ We thank [Compute-Canada](https://www.computecanada.ca/), [Calcul Québec](https
 [Westgrid](https://www.westgrid.ca/) for providing the infrastructure and compute ressources that allow us to
 run the competition.
 
-### UPD: environment setup
-```
-conda create --name asdf
-conda activate asdf
-conda install pytorch torchvision torchaudio cudatoolkit=10.2 -c pytorch
-conda install pyg -c pyg
-conda install scip -c scip
-conda install ecole -c ecole
-conda install -c conda-forge ecole
-conda install numpy
-```

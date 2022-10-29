@@ -22,12 +22,13 @@ if __name__ == "__main__":
     from model import GNNPolicy
 
     policy = GNNPolicy().to(device)
-    policy.load_state_dict(torch.load(pathlib.Path(running_dir)/'fff.pkl', map_location=device))
+    policy.load_state_dict(torch.load(pathlib.Path(running_dir)/'1_56.pkl', map_location=device))
 
+    time_limit = 1200
     scip_parameters = {
         "separating/maxrounds": 0,
         "presolving/maxrestarts": 0,
-        "limits/time": 300,
+        "limits/time": time_limit,
     }
     env = ecole.environment.Branching(
         observation_function=ecole.observation.NodeBipartite(),
@@ -49,12 +50,13 @@ if __name__ == "__main__":
     instances_valid = sorted(glob.glob('../../instances/miplib/eval/*.mps.gz'))
     for inst_cnt, instance in enumerate(instances_valid):
         print(inst_cnt, instance)
+        sys.stdout.flush()
         # Run the GNN brancher
         nb_nodes, time = 0, 0
         obs, action_set, _, done, info = env.reset(instance)
         nb_nodes += info["nb_nodes"]
         time += info["time"]
-        while not done:
+        while not done and time < time_limit:
             
             # WTF??
             # mask variable features (no incumbent info)
@@ -92,4 +94,6 @@ if __name__ == "__main__":
         print(f"Instance {inst_cnt: >3} | SCIP nb nodes    {int(default_info['nb_nodes']): >4d}  | SCIP time   {default_info['time']: >6.2f} ")
         print(f"             | GNN  nb nodes    {int(nb_nodes): >4d}  | GNN  time   {time: >6.2f} ")
         print(f"             | Gain         {100*(1-nb_nodes/default_info['nb_nodes']): >8.2f}% | Gain      {100*(1-time/default_info['time']): >8.2f}%")
+        sys.stdout.flush()
+
 
