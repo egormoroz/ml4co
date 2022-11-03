@@ -11,7 +11,8 @@ if __name__ == "__main__":
     os.environ['CUDA_VISIBLE_deviceS'] = ''
     device = "cpu"
 
-    running_dir = 'train_files/trained_models/miplib'
+    #running_dir = 'train_files/trained_models/miplib'
+    running_dir = 'train_files/trained_models/item_placement'
 
     # import pytorch **after** cuda setup
     import torch
@@ -22,9 +23,9 @@ if __name__ == "__main__":
     from model import GNNPolicy
 
     policy = GNNPolicy().to(device)
-    policy.load_state_dict(torch.load(pathlib.Path(running_dir)/'1_56.pkl', map_location=device))
+    policy.load_state_dict(torch.load(pathlib.Path(running_dir)/'best_params.pkl', map_location=device))
 
-    time_limit = 1200
+    time_limit = 600
     scip_parameters = {
         "separating/maxrounds": 0,
         "presolving/maxrestarts": 0,
@@ -47,8 +48,9 @@ if __name__ == "__main__":
         scip_params=scip_parameters,
     )
 
-    instances_valid = sorted(glob.glob('../../instances/miplib/eval/*.mps.gz'))
-    for inst_cnt, instance in enumerate(instances_valid):
+    #instances = sorted(glob.glob('../../instances/miplib/eval/*.mps.gz'))
+    instances = sorted(glob.glob('../../instances/1_item_placement/valid/*.mps.gz'))
+    for inst_cnt, instance in enumerate(instances):
         print(inst_cnt, instance)
         sys.stdout.flush()
         # Run the GNN brancher

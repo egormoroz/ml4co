@@ -13,6 +13,7 @@ import numpy as np
 from pathlib import Path
 from datetime import datetime
 import time
+import collections
 
 # import environment
 sys.path.append('../..')
@@ -21,6 +22,27 @@ from common.environments import Branching as Environment
 def myprint(*args, **kwargs):
     print(f'[{datetime.now()}]', end=' ')
     print(*args, **kwargs)
+
+
+class RingBuffer:
+    def __init__(self, n):
+        self.entries = [None] * n
+        self.idx = 0
+        self.prev_idx = None
+
+    def append(self, x):
+        self.entries[self.idx] = x
+        self.idx = (self.idx + 1) % len(self.entries)
+
+    def first_entry(self):
+        if self.idx + 1 == len(self.entries) or self.entries[-1] == None:
+            return self.entries[0]
+        return self.entries[self.idx + 1]
+
+    def last_entry(self):
+        if self.idx > 0:
+            return self.entries[self.idx - 1]
+        return self.entries[-1]
 
 
 class ExploreThenStrongBranch:
@@ -111,6 +133,7 @@ def send_orders(orders_queue, instances, seed, query_expert_prob, time_limit, ou
         seed = rng.randint(2**32)
         orders_queue.put([episode, instance, initial_primal_bound, seed, query_expert_prob, time_limit, out_dir])
         episode += 1
+    myprint('done')
 
 
 def make_samples(in_queue, out_queue, stop_flag):
@@ -227,7 +250,8 @@ def collect_samples(instances, out_dir, rng, n_samples, n_jobs, query_expert_pro
     """
     os.makedirs(out_dir, exist_ok=True)
 
-    start_tp = time.time()
+    records = RingBuffer(n=10000)
+    records.append((0, time.time()))
 
     # start workers
     orders_queue = queue.Queue(maxsize=2*n_jobs)
@@ -270,6 +294,7 @@ def collect_samples(instances, out_dir, rng, n_samples, n_jobs, query_expert_pro
             buffer[sample['episode']].append(sample)
             if sample['type'] == 'sample':
                 in_buffer += 1
+                records.append((i + in_buffer, time.time()))
 
         # if any, write samples from current episode
         while current_episode in buffer and buffer[current_episode]:
@@ -288,9 +313,14 @@ def collect_samples(instances, out_dir, rng, n_samples, n_jobs, query_expert_pro
                     os.rename(sample['filename'], f'{out_dir}/sample_{i+1}.pkl')
                     in_buffer -= 1
                     i += 1
-                    elapsed = time.time() - start_tp
-                    samples_per_sec = i / elapsed
+
+                    start_samples, start_tp = records.first_entry()
+                    end_samples, end_tp = records.last_entry()
+                    delta_samples, delta_time = end_samples - start_samples, end_tp - start_tp
+
+                    samples_per_sec = max(delta_samples, 1e-8) / max(delta_time, 1e-8)
                     eta = ((n_samples - i) / samples_per_sec) / 3600
+
                     myprint(f"[m {threading.current_thread().name}] {i} / {n_samples} samples written, "
                           f"ep {sample['episode']} ({in_buffer} in buffer) "
                             "{:.2f} samples/s eta: {:.2f}h.\n".format(samples_per_sec, eta), end='')
@@ -317,7 +347,7 @@ if __name__ == '__main__':
     parser.add_argument(
         'problem',
         help='MILP instance type to process.',
-        choices=['item_placement', 'load_balancing', 'anonymous', 'miplib'],
+#        choices=['item_placement', 'load_balancing', 'anonymous', 'miplib'],
     )
     parser.add_argument(
         '-s', '--seed',
@@ -335,12 +365,6 @@ if __name__ == '__main__':
 
     myprint(f"seed {args.seed}")
 
-    # parameters
-    node_record_prob = 0.05 # probability of running the expert strategy and collecting samples.
-    time_limit = 1200 # time limit for solving each instance
-    train_size = 200000 # number of samples of each type
-    valid_size = 20000
-
     # get instances
     if args.problem == 'item_placement':
         instances_train = glob.glob('../../instances/1_item_placement/train/*.mps.gz')
@@ -357,13 +381,16 @@ if __name__ == '__main__':
         instances_valid = glob.glob('../../instances/3_anonymous/valid/*.mps.gz')
         out_dir = 'train_files/samples/3_anonymous'
 
-    elif args.problem == 'miplib':
-        instances_train = glob.glob('../../instances/miplib/train/*.mps.gz')
-        instances_valid = glob.glob('../../instances/miplib/valid/*.mps.gz')
-        out_dir = 'train_files/samples/miplib'
-
     else:
-        raise NotImplementedError
+        instances_train = glob.glob(f'../../instances/{args.problem}/train/*.mps.gz')
+        instances_valid = glob.glob(f'../../instances/{args.problem}/valid/*.mps.gz')
+        out_dir = f'train_files/samples/{args.problem}'
+
+    # parameters
+    node_record_prob = 0.05 # probability of running the expert strategy and collecting samples.
+    time_limit = 1200 # time limit for solving each instance
+    train_size = min(len(instances_train) * 1000, 100000)
+    valid_size = min(len(instances_valid) * 1000, 20000)
 
     myprint(f"{len(instances_train)} train instances for {train_size} samples")
     myprint(f"{len(instances_valid)} validation instances for {valid_size} samples")
@@ -382,3 +409,4 @@ if __name__ == '__main__':
     collect_samples(instances_valid, out_dir + '/valid', rng, valid_size,
                     args.njobs, query_expert_prob=node_record_prob,
                     time_limit=time_limit)
+
