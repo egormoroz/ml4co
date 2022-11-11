@@ -127,11 +127,13 @@ def send_orders(orders_queue, instances, seed, query_expert_prob, time_limit, ou
     episode = 0
     while not stop_flag.is_set():
         instance = Path(rng.choice(instances))
+        '''
         with open(instance.with_name(instance.stem).with_suffix('.json')) as f:
             instance_info = json.load(f)
         initial_primal_bound = instance_info["primal_bound"]
+        '''
         seed = rng.randint(2**32)
-        orders_queue.put([episode, instance, initial_primal_bound, seed, query_expert_prob, time_limit, out_dir])
+        orders_queue.put([episode, instance, None, seed, query_expert_prob, time_limit, out_dir])
         episode += 1
     myprint('done')
 
@@ -176,8 +178,8 @@ def make_samples(in_queue, out_queue, stop_flag):
         })
 
         env.seed(seed)
-        observation, action_set, _, done, _ = env.reset(str(instance), objective_limit=initial_primal_bound)
-        #observation, action_set, _, done, _ = env.reset(str(instance))
+        #observation, action_set, _, done, _ = env.reset(str(instance), objective_limit=initial_primal_bound)
+        observation, action_set, _, done, _ = env.reset(str(instance))
         while not done:
             scores, scores_are_expert = observation["scores"]
             node_observation = observation["node_observation"]
@@ -296,6 +298,8 @@ def collect_samples(instances, out_dir, rng, n_samples, n_jobs, query_expert_pro
                 in_buffer += 1
                 records.append((i + in_buffer, time.time()))
 
+        sys.stdout.flush()
+
         # if any, write samples from current episode
         while current_episode in buffer and buffer[current_episode]:
             samples_to_write = buffer[current_episode]
@@ -388,7 +392,7 @@ if __name__ == '__main__':
 
     # parameters
     node_record_prob = 0.05 # probability of running the expert strategy and collecting samples.
-    time_limit = 1200 # time limit for solving each instance
+    time_limit = 600 # time limit for solving each instance
     train_size = min(len(instances_train) * 1000, 100000)
     valid_size = min(len(instances_valid) * 1000, 20000)
 

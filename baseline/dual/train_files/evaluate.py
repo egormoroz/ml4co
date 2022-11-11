@@ -6,13 +6,14 @@ import pathlib
 import numpy as np
 import ecole
 
+import time as tmm
 
 if __name__ == "__main__":
     os.environ['CUDA_VISIBLE_deviceS'] = ''
     device = "cpu"
 
-    #running_dir = 'train_files/trained_models/miplib'
-    running_dir = 'train_files/trained_models/item_placement'
+    running_dir = 'train_files/trained_models/miplib'
+    #running_dir = 'train_files/trained_models/item_placement'
 
     # import pytorch **after** cuda setup
     import torch
@@ -48,17 +49,18 @@ if __name__ == "__main__":
         scip_params=scip_parameters,
     )
 
-    #instances = sorted(glob.glob('../../instances/miplib/eval/*.mps.gz'))
-    instances = sorted(glob.glob('../../instances/1_item_placement/valid/*.mps.gz'))
+    instances = sorted(glob.glob('../../instances/miplib/eval/*.mps.gz'))
+    #instances = sorted(glob.glob('../../instances/1_item_placement/valid/*.mps.gz'))
     for inst_cnt, instance in enumerate(instances):
         print(inst_cnt, instance)
         sys.stdout.flush()
         # Run the GNN brancher
+        start = tmm.time()
         nb_nodes, time = 0, 0
         obs, action_set, _, done, info = env.reset(instance)
         nb_nodes += info["nb_nodes"]
-        time += info["time"]
-        while not done and time < time_limit:
+        #time += info["time"]
+        while not done and tmm.time() - start < time_limit:
             
             # WTF??
             # mask variable features (no incumbent info)
@@ -73,29 +75,41 @@ if __name__ == "__main__":
             variable_features = torch.FloatTensor(variable_features)
 
             with torch.no_grad():
-                '''
-                observation = (
-                    torch.from_numpy(observation.row_features.astype(np.float32)).to(device),
-                    torch.from_numpy(observation.edge_features.indices.astype(np.int64)).to(device),
-                    torch.from_numpy(observation.edge_features.values.astype(np.float32)).view(-1, 1).to(device),
-                    torch.from_numpy(observation.column_features.astype(np.float32)).to(device),
-                )
-                '''
                 logits = policy(constraint_features, edge_indices, 
                         edge_features, variable_features)
                 action = action_set[logits[action_set.astype(np.int64)].argmax()]
                 obs, action_set, _, done, info = env.step(action)
             nb_nodes += info["nb_nodes"]
-            time += info["time"]
+            #time += info["time"]
+            time = tmm.time() - start
+
+            dual, primal = env.model.dual_bound, env.model.primal_bound
+            gap = (abs(dual - primal)) / max(1e-8, min(abs(dual), abs(primal)))
+            #print(' time {:6.2f}  nodes {: >6}  '
+            #      'dual {:9.2e}  primal {:9.2e}  gap {:9.2e}'.format(
+            #          time, int(nb_nodes), dual, primal, gap), end='\r')
+
+        dual, primal = env.model.dual_bound, env.model.primal_bound
+        gap = (abs(dual - primal)) / max(1e-8, min(abs(dual), abs(primal)))
+        print(' time {:6.2f}  nodes {: >6}  '
+              'dual {:9.2e}  primal {:9.2e}  gap {:9.2e}'.format(
+                  time, int(nb_nodes), dual, primal, gap))
 
         # Run SCIP's default brancher
+        start = tmm.time()
         default_env.reset(instance)
         _, _, _, _, default_info = default_env.step({})
-
-
-        print(f"Instance {inst_cnt: >3} | SCIP nb nodes    {int(default_info['nb_nodes']): >4d}  | SCIP time   {default_info['time']: >6.2f} ")
-        print(f"             | GNN  nb nodes    {int(nb_nodes): >4d}  | GNN  time   {time: >6.2f} ")
-        print(f"             | Gain         {100*(1-nb_nodes/default_info['nb_nodes']): >8.2f}% | Gain      {100*(1-time/default_info['time']): >8.2f}%")
-        sys.stdout.flush()
+        def_dual, def_primal = default_env.model.dual_bound, default_env.model.primal_bound
+        def_gap = (abs(def_dual - def_primal)) / max(1e-8, min(abs(def_dual), abs(def_primal)))
+        #def_time, def_nodes = default_info['time'], default_info['nb_nodes']
+        def_time, def_nodes = tmm.time() - start, default_info['nb_nodes']
+        print(' time {:6.2f}  nodes {: >6}  '
+              'dual {:9.2e}  primal {:9.2e}  gap {:9.2e}'.format(
+                  def_time, int(def_nodes), def_dual, def_primal, def_gap))
+        print('dtime {:6.2f} dnodes {: >6} '
+              'ddual {:9.2e} dprimal {:9.2e} dgap {:9.2e}'.format(
+                  time-def_time, int(nb_nodes-def_nodes), 
+                  dual-def_dual, primal-def_primal, gap-def_gap))
+        print()
 
 
