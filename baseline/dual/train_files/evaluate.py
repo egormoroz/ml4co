@@ -5,6 +5,7 @@ import argparse
 import pathlib
 import numpy as np
 import ecole
+import json
 
 import time as tmm
 
@@ -12,7 +13,7 @@ if __name__ == "__main__":
     os.environ['CUDA_VISIBLE_deviceS'] = ''
     device = "cpu"
 
-    running_dir = 'train_files/trained_models/miplib'
+    running_dir = 'train_files/trained_models/set_partitioning'
     #running_dir = 'train_files/trained_models/item_placement'
 
     # import pytorch **after** cuda setup
@@ -49,9 +50,13 @@ if __name__ == "__main__":
         scip_params=scip_parameters,
     )
 
-    instances = sorted(glob.glob('../../instances/miplib/eval/*.mps.gz'))
+    records = {}
+
+    instances = sorted(glob.glob('../../instances/set_partitioning/train/*.mps.gz'))
     #instances = sorted(glob.glob('../../instances/1_item_placement/valid/*.mps.gz'))
     for inst_cnt, instance in enumerate(instances):
+        inst_name = instance.rpartition('/')[-1]
+
         print(inst_cnt, instance)
         sys.stdout.flush()
         # Run the GNN brancher
@@ -111,5 +116,14 @@ if __name__ == "__main__":
                   time-def_time, int(nb_nodes-def_nodes), 
                   dual-def_dual, primal-def_primal, gap-def_gap))
         print()
+
+        records[inst_name] = {
+            'gnn': { 'time': time, 'nodes': int(nb_nodes), 'dual': dual, 
+                'primal': primal, 'gap': gap },
+            'scip': { 'time': def_time, 'nodes': int(def_nodes), 'dual': def_dual, 
+                'primal': def_primal, 'gap': def_gap },
+        }
+        with open('records.json', 'w') as f:
+            json.dump(records, f)
 
 
