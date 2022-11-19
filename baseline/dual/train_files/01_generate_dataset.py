@@ -127,13 +127,13 @@ def send_orders(orders_queue, instances, seed, query_expert_prob, time_limit, ou
     episode = 0
     while not stop_flag.is_set():
         instance = Path(rng.choice(instances))
-        '''
         with open(instance.with_name(instance.stem).with_suffix('.json')) as f:
             instance_info = json.load(f)
         initial_primal_bound = instance_info["primal_bound"]
-        '''
+
         seed = rng.randint(2**32)
-        orders_queue.put([episode, instance, None, seed, query_expert_prob, time_limit, out_dir])
+        orders_queue.put([episode, instance, initial_primal_bound, 
+            seed, query_expert_prob, time_limit, out_dir])
         episode += 1
     myprint('done')
 
@@ -177,9 +177,17 @@ def make_samples(in_queue, out_queue, stop_flag):
             'seed': seed,
         })
 
-        env.seed(seed)
-        #observation, action_set, _, done, _ = env.reset(str(instance), objective_limit=initial_primal_bound)
-        observation, action_set, _, done, _ = env.reset(str(instance))
+        n_inst_samples = 0
+        try:
+            env.seed(seed)
+            observation, action_set, _, done, _ = env.reset(str(instance), objective_limit=initial_primal_bound)
+        except Exception as e:
+            done = True
+            with open("error_log.txt","a") as f:
+                f.write(f"Error occurred solving {instance} with seed {seed}\n")
+                f.write(f"{e}\n")
+
+        #observation, action_set, _, done, _ = env.reset(str(instance))
         while not done:
             scores, scores_are_expert = observation["scores"]
             node_observation = observation["node_observation"]
@@ -209,6 +217,7 @@ def make_samples(in_queue, out_queue, stop_flag):
                     'filename': filename,
                 })
                 sample_counter += 1
+                n_inst_samples += 1
 
             try:
                 observation, action_set, _, done, _ = env.step(action)
@@ -393,8 +402,8 @@ if __name__ == '__main__':
     # parameters
     node_record_prob = 0.05 # probability of running the expert strategy and collecting samples.
     time_limit = 600 # time limit for solving each instance
-    train_size = min(len(instances_train) * 1000, 100000)
-    valid_size = min(len(instances_valid) * 1000, 20000)
+    train_size = 200000
+    valid_size = 20000
 
     myprint(f"{len(instances_train)} train instances for {train_size} samples")
     myprint(f"{len(instances_valid)} validation instances for {valid_size} samples")

@@ -4,6 +4,7 @@ import glob
 import argparse
 import pathlib
 import numpy as np
+import shutil
 
 
 def pretrain(policy, pretrain_loader):
@@ -105,7 +106,7 @@ if __name__ == "__main__":
     parser.add_argument(
         'problem',
         help='MILP instance type to process.',
-        choices=['item_placement', 'load_balancing', 'anonymous', 'miplib'],
+#        choices=['item_placement', 'load_balancing', 'anonymous', 'miplib'],
     )
     parser.add_argument(
         '-s', '--seed',
@@ -124,7 +125,7 @@ if __name__ == "__main__":
     # hyper parameters
     max_epochs = 1000
     batch_size = 128
-    batches_per_epoch = 40960 // batch_size
+    batches_per_epoch = 20480 // batch_size
     pretrain_batch_size = 128
     valid_batch_size = 128
     lr = 1e-3
@@ -146,13 +147,10 @@ if __name__ == "__main__":
         valid_files = glob.glob('train_files/samples/3_anonymous/valid/sample_*.pkl')
         running_dir = 'train_files/trained_models/anonymous'
 
-    elif args.problem == 'miplib':
-        train_files = glob.glob('train_files/samples/miplib/train/sample_*.pkl')
-        valid_files = glob.glob('train_files/samples/miplib/valid/sample_*.pkl')
-        running_dir = 'train_files/trained_models/miplib'
-
     else:
-        raise NotImplementedError
+        train_files = glob.glob(f'train_files/samples/{args.problem}/train/sample_*.pkl')
+        valid_files = glob.glob(f'train_files/samples/{args.problem}/valid/sample_*.pkl')
+        running_dir = f'train_files/trained_models/{args.problem}'
 
     pretrain_files = [f for i, f in enumerate(train_files) if i % 10 == 0]
 
@@ -223,8 +221,11 @@ if __name__ == "__main__":
 
         scheduler.step(valid_loss)
         if scheduler.num_bad_epochs == 0:
-            torch.save(policy.state_dict(), pathlib.Path(running_dir)/'best_params.pkl')
+            params_path = pathlib.Path(running_dir)/'best_params.pkl'
+            torch.save(policy.state_dict(), params_path)
             log(f"  best model so far", logfile)
+            shutil.copy(params_path, '/content/drive/MyDrive/best_params.pkl')
+            shutil.copy(logfile, '/content/drive/MyDrive/train_log.txt')
         elif scheduler.num_bad_epochs == 10:
             log(f"  10 epochs without improvement, decreasing learning rate", logfile)
         elif scheduler.num_bad_epochs == 20:

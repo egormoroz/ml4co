@@ -10,10 +10,11 @@ import json
 import time as tmm
 
 if __name__ == "__main__":
+    prob = 'cluster'
     os.environ['CUDA_VISIBLE_deviceS'] = ''
     device = "cpu"
 
-    running_dir = 'train_files/trained_models/set_partitioning'
+    running_dir = f'train_files/trained_models/{prob}'
     #running_dir = 'train_files/trained_models/item_placement'
 
     # import pytorch **after** cuda setup
@@ -52,7 +53,8 @@ if __name__ == "__main__":
 
     records = {}
 
-    instances = sorted(glob.glob('../../instances/set_partitioning/train/*.mps.gz'))
+    instances = glob.glob(f'../../instances/{prob}/train/*.mps.gz')
+    instances.sort(key=os.path.getsize)
     #instances = sorted(glob.glob('../../instances/1_item_placement/valid/*.mps.gz'))
     for inst_cnt, instance in enumerate(instances):
         inst_name = instance.rpartition('/')[-1]
@@ -90,9 +92,9 @@ if __name__ == "__main__":
 
             dual, primal = env.model.dual_bound, env.model.primal_bound
             gap = (abs(dual - primal)) / max(1e-8, min(abs(dual), abs(primal)))
-            #print(' time {:6.2f}  nodes {: >6}  '
-            #      'dual {:9.2e}  primal {:9.2e}  gap {:9.2e}'.format(
-            #          time, int(nb_nodes), dual, primal, gap), end='\r')
+            print(' time {:6.2f}  nodes {: >6}  '
+                  'dual {:9.2e}  primal {:9.2e}  gap {:9.2e}'.format(
+                      time, int(nb_nodes), dual, primal, gap), end='\r')
 
         dual, primal = env.model.dual_bound, env.model.primal_bound
         gap = (abs(dual - primal)) / max(1e-8, min(abs(dual), abs(primal)))
