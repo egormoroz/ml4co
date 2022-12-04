@@ -4,6 +4,7 @@ import json
 import pathlib
 
 import ecole as ec
+from time import time
 import numpy as np
 
 
@@ -17,7 +18,7 @@ if __name__ == '__main__':
     parser.add_argument(
         'problem',
         help='Problem benchmark to process.',
-        choices=['item_placement', 'load_balancing', 'anonymous'],
+        choices=['item_placement', 'anonymous'],
     )
     parser.add_argument(
         '-t', '--timelimit',
@@ -48,9 +49,6 @@ if __name__ == '__main__':
     if args.problem == 'item_placement':
         instances_path = pathlib.Path(f"../../instances/1_item_placement/{args.folder}/")
         results_file = pathlib.Path(f"results/{args.task}/1_item_placement.csv")
-    elif args.problem == 'load_balancing':
-        instances_path = pathlib.Path(f"../../instances/2_load_balancing/{args.folder}/")
-        results_file = pathlib.Path(f"results/{args.task}/2_load_balancing.csv")
     elif args.problem == 'anonymous':
         instances_path = pathlib.Path(f"../../instances/3_anonymous/{args.folder}/")
         results_file = pathlib.Path(f"results/{args.task}/3_anonymous.csv")
@@ -146,8 +144,8 @@ if __name__ == '__main__':
             print(f"  reward: {reward}")
             print(f"  action_set: {action_set}")
 
+        t = time()
         cumulated_reward = 0  # discard initial reward
-
         # loop over the environment
         while not done:
             action = policy(action_set, observation)
@@ -165,6 +163,10 @@ if __name__ == '__main__':
             cumulated_reward += reward
 
         print(f"  cumulated reward (to be maximized): {cumulated_reward}")
+        delta = time() - t
+        dual, primal = env.model.dual_bound, env.model.primal_bound
+        print('time {:6.2f} dual {:9.2e} primal {:9.2e} reward {}'.format(
+            time, dual, primal, cumulated_reward))
 
         # save instance results
         with open(results_file, mode='a') as csv_file:
@@ -177,3 +179,34 @@ if __name__ == '__main__':
                 'objective_offset': objective_offset,
                 'cumulated_reward': cumulated_reward,
             })
+
+        integral_function = BoundIntegral()
+        fsb_env = ec.environment.Configuring(
+            observation_function=None,
+            reward_function=-integral_function,  # negated integral (minimization)
+            scip_params={
+                'limits/memory': memory_limit,
+                'limits/time_limit': time_limit,
+                'branching/fullstrong/priority': 100000,
+            },
+        )
+
+        fsb_env.seed(seed)
+        integral_function.set_parameters(
+                initial_primal_bound=initial_primal_bound,
+                initial_dual_bound=initial_dual_bound,
+                objective_offset=objective_offset)
+        _, _, reward, done, info = fsb_env.reset(
+                str(instance), objective_limit=initial_primal_bound)
+
+        cumulated_reward += reward
+        t = time()
+        _, _, reward, _, _ = fsb_env.step({})
+        cumulated_reward += reward
+        delta = time() - t
+        dual, primal = env.model.dual_bound, env.model.primal_bound
+        print('time {:6.2f} dual {:9.2e} primal {:9.2e}'.format(
+            time, dual, primal))
+        print('time {:6.2f} dual {:9.2e} primal {:9.2e} reward {}'.format(
+            time, dual, primal, cumulated_reward))
+
