@@ -82,7 +82,8 @@ if __name__ == '__main__':
         from agents.dual import Policy, ObservationFunction
         from environments import Branching as Environment
         from rewards import TimeLimitDualIntegral as BoundIntegral
-        time_limit = 15*60
+        time_limit = 5
+        # time_limit = 15*60
         memory_limit = 8796093022207  # maximum
 
     elif args.task == "config":
@@ -166,7 +167,7 @@ if __name__ == '__main__':
         delta = time() - t
         dual, primal = env.model.dual_bound, env.model.primal_bound
         print('time {:6.2f} dual {:9.2e} primal {:9.2e} reward {}'.format(
-            time, dual, primal, cumulated_reward))
+            delta, dual, primal, cumulated_reward))
 
         # save instance results
         with open(results_file, mode='a') as csv_file:
@@ -186,7 +187,7 @@ if __name__ == '__main__':
             reward_function=-integral_function,  # negated integral (minimization)
             scip_params={
                 'limits/memory': memory_limit,
-                'limits/time_limit': time_limit,
+                'limits/time': time_limit,
                 'branching/fullstrong/priority': 100000,
             },
         )
@@ -196,8 +197,7 @@ if __name__ == '__main__':
                 initial_primal_bound=initial_primal_bound,
                 initial_dual_bound=initial_dual_bound,
                 objective_offset=objective_offset)
-        _, _, reward, done, info = fsb_env.reset(
-                str(instance), objective_limit=initial_primal_bound)
+        _, _, reward, done, info = fsb_env.reset(str(instance))
 
         cumulated_reward += reward
         t = time()
@@ -205,8 +205,6 @@ if __name__ == '__main__':
         cumulated_reward += reward
         delta = time() - t
         dual, primal = env.model.dual_bound, env.model.primal_bound
-        print('time {:6.2f} dual {:9.2e} primal {:9.2e}'.format(
-            time, dual, primal))
         print('time {:6.2f} dual {:9.2e} primal {:9.2e} reward {}'.format(
-            time, dual, primal, cumulated_reward))
+            delta, dual, primal, cumulated_reward))
 
