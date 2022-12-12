@@ -55,6 +55,7 @@ if __name__ == '__main__':
 
     print(f"Processing instances from {instances_path.resolve()}")
     instance_files = list(instances_path.glob('*.mps.gz'))
+    instance_files.sort()
 
     if args.problem == 'anonymous': 
         # special case: evaluate the anonymous instances five times with different seeds
@@ -199,12 +200,12 @@ if __name__ == '__main__':
                 objective_offset=objective_offset)
         _, _, reward, done, info = fsb_env.reset(str(instance))
 
-        cumulated_reward += reward
+        cumulated_reward = reward
         t = time()
         _, _, reward, _, _ = fsb_env.step({})
         cumulated_reward += reward
         delta = time() - t
-        dual, primal = env.model.dual_bound, env.model.primal_bound
+        dual, primal = fsb_env.model.dual_bound, fsb_env.model.primal_bound
         print('time {:6.2f} dual {:9.2e} primal {:9.2e} reward {}'.format(
             delta, dual, primal, cumulated_reward))
 
